@@ -1,9 +1,12 @@
-from modules.readers import CsvReader, JsonReader
+from modules.readers import get_reader
 
 
-def run(path: str):
-    reader = CsvReader(path, ';') #JsonReader(path)
-    data = reader.get_data()
+def run(cfg):
+    reader = get_reader(cfg)
 
-    for key, value in data.items():
-        print(f'{key}: {value}')
+    if reader is not None:
+        hosts = reader.get_data()
+        for host in hosts:
+            print(f'[{host.host_type}] {host.name}: {host.ports}')
+    else:
+        print(f'Модуль для обработки файлов {cfg.f} не найден!')
