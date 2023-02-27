@@ -1,3 +1,4 @@
+from modules.entities import HostTypes
 from modules.readers import get_reader
 
 
@@ -6,7 +7,11 @@ def run(cfg):
 
     if reader is not None:
         hosts = reader.get_data()
+
         for host in hosts:
-            print(f'[{host.host_type}] {host.name}: {host.ports}')
+            if host.host_type == HostTypes.DOMAIN:
+                pass
+            elif host.host_type == HostTypes.IP:
+                pass
     else:
-        print(f'Модуль для обработки файлов {cfg.f} не найден!')
+        print(f"Модуль для обработки файлов {cfg.f} не найден!")
