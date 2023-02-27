@@ -1,8 +1,9 @@
 import csv
 import json
 from abc import ABC, abstractmethod
+from contextlib import closing
 
-from .entities import Host, HostTypes, Port
+from .entities import Host, Port
 from .validation import ValidationTypes, validate_str
 
 
@@ -23,7 +24,7 @@ class CsvReader(Reader):
     def get_data(self) -> list[Host]:
         data_list = []
 
-        with open(self.path, 'r') as file:
+        with closing(open(self.path, 'r')) as file:
             file_data = csv.reader(file, delimiter=self.delimiter)
             next(file_data, None)
 
@@ -38,10 +39,21 @@ class CsvReader(Reader):
 
                 if is_ip or is_domain:
                     ports = row[1].split(',') if row[1] != '' else []
+                    for i in range(len(ports)):
+                        validation_results = validate_str(ports[i], [ValidationTypes.CORRECT_PORT])
+
+                        has_key = ValidationTypes.CORRECT_PORT in validation_results.keys()
+                        is_successful = validation_results[ValidationTypes.CORRECT_PORT].result
+
+                        if has_key and not is_successful:
+                            print(f'Ошибка в строке {row}: '
+                                  f'{validation_results[ValidationTypes.CORRECT_PORT].message}!')
+                            ports[i] = None
+
                     data_list.append(Host(
-                        HostTypes.DOMAIN if is_domain else HostTypes.IP,
-                        row[0],
-                        [Port(port, False) for port in ports]
+                        row[0] if is_domain else '',
+                        [] if is_domain else [row[0]],
+                        [Port(int(port), False) for port in ports if port is not None]
                     ))
                 else:
                     failed_results = [item for item in validation_results.values() if not item.result]
@@ -54,7 +66,7 @@ class JsonReader(Reader):
     def get_data(self) -> list[Host]:
         data_list = []
 
-        with open(self.path, 'r') as file:
+        with closing(open(self.path, 'r')) as file:
             file_data = json.load(file)
 
             for obj in file_data:
@@ -70,10 +82,21 @@ class JsonReader(Reader):
                     if is_ip or is_domain:
                         values = list(key_values.values())
                         ports = values[0] if len(values) != 0 else []
+                        for i in range(len(ports)):
+                            validation_results = validate_str(ports[i], [ValidationTypes.CORRECT_PORT])
+
+                            has_key = ValidationTypes.CORRECT_PORT in validation_results.keys()
+                            is_successful = validation_results[ValidationTypes.CORRECT_PORT].result
+
+                            if has_key and not is_successful:
+                                print(f'Ошибка в значении {ports[i]}: '
+                                      f'{validation_results[ValidationTypes.CORRECT_PORT].message}!')
+                                ports[i] = None
+
                         data_list.append(Host(
-                            HostTypes.DOMAIN if is_domain else HostTypes.IP,
-                            key,
-                            [Port(port, False) for port in ports]
+                            key if is_domain else '',
+                            [] if is_domain else [key],
+                            [Port(int(port), False) for port in ports if port is not None]
                         ))
                     else:
                         failed_results = [item for item in validation_results.values() if not item.result]

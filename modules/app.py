@@ -1,4 +1,4 @@
-from modules.entities import HostTypes
+from modules.network import NetworkService, DnsResolver, Pinger, PortScanner
 from modules.readers import get_reader
 
 
@@ -7,11 +7,12 @@ def run(cfg):
 
     if reader is not None:
         hosts = reader.get_data()
+        network_scanner = NetworkService(DnsResolver(), [Pinger(), PortScanner()])
+        messages = []
 
         for host in hosts:
-            if host.host_type == HostTypes.DOMAIN:
-                pass
-            elif host.host_type == HostTypes.IP:
-                pass
+            messages = network_scanner.monitor(host)
     else:
-        print(f"Модуль для обработки файлов {cfg.f} не найден!")
+        messages = [f"Модуль для обработки файлов {cfg.f} не найден!"]
+
+    print('\n'.join(messages))

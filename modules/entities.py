@@ -1,20 +1,14 @@
 from dataclasses import dataclass
-from enum import Enum
-
-
-class HostTypes(Enum):
-    DOMAIN = 0
-    IP = 1
 
 
 @dataclass
 class Port:
-    name: str
+    value: int
     is_opened: bool
 
 
 @dataclass
 class Host:
-    host_type: HostTypes
-    name: str
+    domain_name: str
+    ip_addresses: list[str]
     ports: list[Port]
