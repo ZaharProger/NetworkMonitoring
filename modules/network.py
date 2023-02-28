@@ -1,26 +1,34 @@
 from pythonping import ping
 from datetime import datetime
-from abc import ABC, abstractmethod
 from contextlib import closing
+from abc import ABC, abstractmethod
 import socket
 from time import time
 
-from modules.entities import Host
-
-
-class DnsResolver:
-    @staticmethod
-    def resolve(name: str) -> list[str]:
-        return socket.gethostbyname_ex(name)[2]
+from .entities import Host
 
 
 class Scanner(ABC):
-    def __init__(self, log_format: str = '%Y-%m-%d %H:%M:%S:%f'):
-        self._log_format = log_format
-
     @abstractmethod
-    def scan(self, host: Host):
+    def scan(self, host: Host) -> list[str]:
         ...
+
+
+class DnsResolver(Scanner):
+    def scan(self, host: Host) -> list[str]:
+        incorrect_domain = False
+
+        if host.domain_name != '':
+            try:
+                host.ip_addresses = socket.gethostbyname_ex(host.domain_name)[2]
+            except socket.gaierror:
+                incorrect_domain = True
+
+        messages = [f'\n{host.domain_name} {host.ip_addresses} {host.ports}']
+        if incorrect_domain:
+            messages.append(f'Ошибка в элементе {host.domain_name}: Не удалось разрешить доменное имя!')
+
+        return messages
 
 
 class PortScanner(Scanner):
@@ -30,49 +38,84 @@ class PortScanner(Scanner):
             for address in host.ip_addresses:
                 for port in host.ports:
                     start_time = time() * 1000
-                    port.is_opened = sock.connect_ex((address, port.value)) == 0
+                    is_opened = sock.connect_ex((address, port)) == 0
                     end_time = time() * 1000
 
-                    current_time = datetime.now().strftime(self._log_format)
-                    rtt = end_time - start_time
+                    current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S:%f')
+                    rtt = round(end_time - start_time, 2)
 
-                    messages.append(f'{current_time} {host.domain_name} {address} {rtt}ms '
-                                    f"{port.value} {'Opened' if port.is_opened else 'Unknown'}")
+                    messages.append(f'{current_datetime} {host.domain_name} {address} {rtt}ms '
+                                    f"{port} {'Opened' if is_opened else 'Unknown'}")
 
         return messages
 
 
 class Pinger(Scanner):
+    def __init__(self, packets_amount: int = 4, packet_size: int = 4, timeout: int = 3):
+        self.__packets_amount = packets_amount
+        self.__packet_size = packet_size
+        self.__timeout = timeout
+
+    @property
+    def packets_amount(self):
+        return self.__packets_amount
+
+    @packets_amount.setter
+    def packets_amount(self, packets_amount: int):
+        if packets_amount > 0:
+            self.__packets_amount = packets_amount
+
+    @property
+    def packet_size(self):
+        return self.__packet_size
+
+    @packet_size.setter
+    def packet_size(self, packet_size: int):
+        if packet_size > 0:
+            self.__packet_size = packet_size
+
+    @property
+    def timeout(self):
+        return self.__timeout
+
+    @timeout.setter
+    def timeout(self, timeout: int):
+        if timeout > 0:
+            self.__timeout = timeout
+
     def scan(self, host: Host) -> list[str]:
         messages = []
         for address in host.ip_addresses:
-            start_time = time() * 1000
-            results = ping(address, count=1, size=4)
-            end_time = time() * 1000
+            for i in range(self.__packets_amount):
+                results = ping(address, count=1, size=self.__packet_size, timeout=self.__timeout)
+                current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S:%f')
 
-            current_time = datetime.now().strftime(self._log_format)
-            rtt = end_time - start_time
-
-            messages.append(f'{current_time} {host.domain_name} {address} {rtt}ms '
-                            f'{results.stats_packets_sent} packets sent '
-                            f'{results.stats_packets_returned} packets returned ({results.stats_success_ratio * 100}%) '
-                            f'{results.stats_packets_lost} packets lost ({results.stats_lost_ratio * 100}%)')
+                for result in results:
+                    messages.append(f'{current_datetime} {host.domain_name} {address} {result.time_elapsed_ms}ms '
+                                    f'{results.stats_packets_sent} packets sent '
+                                    f'{results.stats_packets_returned} packets returned '
+                                    f'({results.stats_success_ratio * 100}%) '
+                                    f'{results.stats_packets_lost} packets lost ({results.stats_lost_ratio * 100}%) '
+                                    f"{'Success' if result.error_message is None else result.error_message}")
 
         return messages
 
 
 class NetworkService:
-    def __init__(self, dns_resolver: DnsResolver, scanners: list[Scanner]):
-        self.__dns_resolver = dns_resolver
-        self.__scanners = scanners
+    def __init__(self, dns_resolver: DnsResolver = None, pinger: Pinger = None, port_scanner: PortScanner = None):
+        self.dns_resolver = dns_resolver
+        self.pinger = pinger
+        self.port_scanner = port_scanner
 
-    def monitor(self, host: Host) -> list[str]:
-        if host.domain_name != '' and self.__dns_resolver is not None:
-            host.ip_addresses = self.__dns_resolver.resolve(host.domain_name)
+    def scan_host(self, host: Host) -> list[str]:
+        messages = []
 
-        messages = [f'{host.domain_name} {host.ip_addresses} {[port.value for port in host.ports]}']
-        for scanner in self.__scanners:
-            if scanner is not None:
-                messages.extend(scanner.scan(host))
+        if self.dns_resolver is not None:
+            messages.extend(self.dns_resolver.scan(host))
+
+        if len(host.ports) == 0 and self.pinger is not None:
+            messages.extend(self.pinger.scan(host))
+        elif self.port_scanner is not None:
+            messages.extend(self.port_scanner.scan(host))
 
         return messages

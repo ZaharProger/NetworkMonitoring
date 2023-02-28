@@ -3,23 +3,74 @@ import json
 from abc import ABC, abstractmethod
 from contextlib import closing
 
-from .entities import Host, Port
+from .entities import Host
+from .loggers import Logger, use_logger
 from .validation import ValidationTypes, validate_str
 
 
 class Reader(ABC):
-    def __init__(self, path: str):
-        self.path = path
+    def __init__(self, path: str, logger: Logger = None):
+        self._path = path
+        self.logger = logger
+
+    @property
+    def path(self):
+        return self._path
+
+    @path.setter
+    def path(self, path: str):
+        self._path = path
 
     @abstractmethod
     def get_data(self) -> list[Host]:
         ...
 
+    def _map_item(self, host_str: str, port_list: list[str]) -> Host:
+        mapped_item = None
+        messages = []
+
+        validation_results = validate_str(host_str, [ValidationTypes.NOT_EMPTY_HOST,
+                                                     ValidationTypes.CORRECT_DOMAIN,
+                                                     ValidationTypes.CORRECT_IP])
+
+        is_ip = validation_results[ValidationTypes.CORRECT_IP].result
+        is_domain = validation_results[ValidationTypes.CORRECT_DOMAIN].result and \
+                    not validation_results[ValidationTypes.CORRECT_IP].result
+
+        if is_ip or is_domain:
+            for i in range(len(port_list)):
+                validation_results = validate_str(port_list[i], [ValidationTypes.CORRECT_PORT])
+                if not validation_results[ValidationTypes.CORRECT_PORT].result:
+                    messages.extend([f'Ошибка в элементе {port_list[i]}: '
+                                     f'{validation_results[ValidationTypes.CORRECT_PORT].message}!'])
+                    port_list[i] = None
+
+            mapped_item = Host(
+                host_str if is_domain else '',
+                [] if is_domain else [host_str],
+                [int(port) for port in port_list if port is not None]
+            )
+        else:
+            failed_results = [item for item in validation_results.values() if not item.result]
+            messages.extend([f'Ошибка в элементе {host_str}: {failed_results[0].message}!'])
+
+        use_logger(self.logger, messages)
+
+        return mapped_item
+
 
 class CsvReader(Reader):
     def __init__(self, path: str, delimiter: str):
         super().__init__(path)
-        self.delimiter = delimiter
+        self.__delimiter = delimiter
+
+    @property
+    def delimiter(self):
+        return self.__delimiter
+
+    @delimiter.setter
+    def delimiter(self, delimiter: str):
+        self.__delimiter = delimiter
 
     def get_data(self) -> list[Host]:
         data_list = []
@@ -29,35 +80,9 @@ class CsvReader(Reader):
             next(file_data, None)
 
             for row in file_data:
-                validation_results = validate_str(row[0], [ValidationTypes.NOT_EMPTY_HOST,
-                                                           ValidationTypes.CORRECT_DOMAIN,
-                                                           ValidationTypes.CORRECT_IP])
-
-                is_ip = validation_results[ValidationTypes.CORRECT_IP].result
-                is_domain = validation_results[ValidationTypes.CORRECT_DOMAIN].result and \
-                            not validation_results[ValidationTypes.CORRECT_IP].result
-
-                if is_ip or is_domain:
-                    ports = row[1].split(',') if row[1] != '' else []
-                    for i in range(len(ports)):
-                        validation_results = validate_str(ports[i], [ValidationTypes.CORRECT_PORT])
-
-                        has_key = ValidationTypes.CORRECT_PORT in validation_results.keys()
-                        is_successful = validation_results[ValidationTypes.CORRECT_PORT].result
-
-                        if has_key and not is_successful:
-                            print(f'Ошибка в строке {row}: '
-                                  f'{validation_results[ValidationTypes.CORRECT_PORT].message}!')
-                            ports[i] = None
-
-                    data_list.append(Host(
-                        row[0] if is_domain else '',
-                        [] if is_domain else [row[0]],
-                        [Port(int(port), False) for port in ports if port is not None]
-                    ))
-                else:
-                    failed_results = [item for item in validation_results.values() if not item.result]
-                    print(f'Ошибка в строке {row}: {failed_results[0].message}!')
+                mapped_item = self._map_item(row[0], row[1].split(',') if row[1] != '' else [])
+                if mapped_item is not None:
+                    data_list.append(mapped_item)
 
         return data_list
 
@@ -71,36 +96,13 @@ class JsonReader(Reader):
 
             for obj in file_data:
                 for key, key_values in obj.items():
-                    validation_results = validate_str(key, [ValidationTypes.NOT_EMPTY_HOST,
-                                                            ValidationTypes.CORRECT_DOMAIN,
-                                                            ValidationTypes.CORRECT_IP])
+                    values = list(key_values.values())
+                    ports = values[0] if len(values) != 0 else []
 
-                    is_ip = validation_results[ValidationTypes.CORRECT_IP].result
-                    is_domain = validation_results[ValidationTypes.CORRECT_DOMAIN].result and \
-                                not validation_results[ValidationTypes.CORRECT_IP].result
+                    mapped_item = self._map_item(key, ports)
 
-                    if is_ip or is_domain:
-                        values = list(key_values.values())
-                        ports = values[0] if len(values) != 0 else []
-                        for i in range(len(ports)):
-                            validation_results = validate_str(ports[i], [ValidationTypes.CORRECT_PORT])
-
-                            has_key = ValidationTypes.CORRECT_PORT in validation_results.keys()
-                            is_successful = validation_results[ValidationTypes.CORRECT_PORT].result
-
-                            if has_key and not is_successful:
-                                print(f'Ошибка в значении {ports[i]}: '
-                                      f'{validation_results[ValidationTypes.CORRECT_PORT].message}!')
-                                ports[i] = None
-
-                        data_list.append(Host(
-                            key if is_domain else '',
-                            [] if is_domain else [key],
-                            [Port(int(port), False) for port in ports if port is not None]
-                        ))
-                    else:
-                        failed_results = [item for item in validation_results.values() if not item.result]
-                        print(f'Ошибка в ключе {key}: {failed_results[0].message}!')
+                    if mapped_item is not None:
+                        data_list.append(mapped_item)
 
         return data_list
 
