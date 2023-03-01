@@ -10,7 +10,7 @@
 4. Readers - содержит классы для считывания данных с файлов.
 5. Validation - содержит функции для валидации входных данных
 
-#### UML диаграмма классов
+#### UML диаграммы классов
 ![UML диаграмма Entities](pics/entities.png "UML диаграмма Entities")\
 ![UML диаграмма Loggers](pics/loggers.png "UML диаграмма Loggers")\
 ![UML диаграмма Network](pics/network.png "UML диаграмма Network")\
