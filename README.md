@@ -11,10 +11,10 @@
 5. Validation - содержит функции для валидации входных данных
 
 #### UML диаграмма классов
-[!UML диаграмма Entities](pics/entities.png "UML диаграмма Entities")\
-[!UML диаграмма Loggers](pics/loggers.png "UML диаграмма Loggers")\
-[!UML диаграмма Network](pics/network.png "UML диаграмма Network")\
-[!UML диаграмма Readers](pics/readers.png "UML диаграмма Readers")
+![UML диаграмма Entities](pics/entities.png "UML диаграмма Entities")\
+![UML диаграмма Loggers](pics/loggers.png "UML диаграмма Loggers")\
+![UML диаграмма Network](pics/network.png "UML диаграмма Network")\
+![UML диаграмма Readers](pics/readers.png "UML диаграмма Readers")
 
 ### Как запустить?
 В зависимости от ОС, на которой планируется запускать приложение, запустить в консоли run_script с указанием 
