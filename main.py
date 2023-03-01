@@ -1,6 +1,5 @@
 from argparse import ArgumentParser
-from modules import app
-
+import app
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parse arguments from cmd')

@@ -1,6 +1,6 @@
-from .loggers import ConsoleLogger, use_logger
-from .network import NetworkService, DnsResolver, Pinger, PortScanner
-from .readers import get_reader
+from modules.loggers import ConsoleLogger, use_logger
+from modules.network import NetworkService, DnsResolver, Pinger, PortScanner
+from modules.readers import get_reader
 
 
 def run(cfg):
