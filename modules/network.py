@@ -3,6 +3,7 @@ from datetime import datetime
 from contextlib import closing
 from abc import ABC, abstractmethod
 import socket
+from urllib.request import urlopen
 from time import time
 
 from .entities import Host
@@ -107,15 +108,28 @@ class NetworkService:
         self.pinger = pinger
         self.port_scanner = port_scanner
 
+    @staticmethod
+    def check_connection() -> bool:
+        try:
+            urlopen('https://google.com')
+            is_connected = True
+        except:
+            is_connected = False
+
+        return is_connected
+
     def scan_host(self, host: Host) -> list[str]:
         messages = []
 
-        if self.dns_resolver is not None:
-            messages.extend(self.dns_resolver.scan(host))
+        if NetworkService.check_connection():
+            if self.dns_resolver is not None:
+                messages.extend(self.dns_resolver.scan(host))
 
-        if len(host.ports) == 0 and self.pinger is not None:
-            messages.extend(self.pinger.scan(host))
-        elif self.port_scanner is not None:
-            messages.extend(self.port_scanner.scan(host))
+            if len(host.ports) == 0 and self.pinger is not None:
+                messages.extend(self.pinger.scan(host))
+            elif self.port_scanner is not None:
+                messages.extend(self.port_scanner.scan(host))
+        else:
+            messages.append('\nОтсутствует подключение к интернету!')
 
         return messages

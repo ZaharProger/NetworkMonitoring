@@ -16,7 +16,7 @@ class ValidationResult:
 
 class ValidationTypes(Enum):
     CORRECT_PORT = ValidationCase('[0-9]+', 'Порт содержит некорректные символы')
-    NOT_EMPTY_HOST = ValidationCase('[\\S]+', 'Пропущены доменное имя или IP')
+    NOT_EMPTY_HOST = ValidationCase('[\\S]+', 'Пропущено доменное имя или IP')
     CORRECT_DOMAIN = ValidationCase('^[a-zA-Zа-яА-Я0-9-.]+\\.?[a-zA-Zа-яА-Я]+$',
                                     'Доменное имя содержит недопустимые символы')
     CORRECT_IP = ValidationCase('^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.){3}(?:25[0-5]|2[0-4]['
